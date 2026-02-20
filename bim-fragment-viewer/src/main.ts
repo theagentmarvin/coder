@@ -485,7 +485,9 @@ class BIMFragmentViewer {
     try {
       // Find which model contains this element
       for (const [modelId, model] of this.loadedModels) {
-        if (model.getIds && model.getIds().includes(expressID)) {
+        const adapted = adaptModel(model)
+        const ids = adapted.getIds ? adapted.getIds() : []
+        if (ids.includes(expressID)) {
           const modelIdMap = new Map()
           modelIdMap.set(modelId, new Set([expressID]))
           this.fragments.highlight(
