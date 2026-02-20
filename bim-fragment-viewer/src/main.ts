@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import * as OBC from '@thatopen/components'
 import Stats from 'stats.js'
 import './style.css'
-import { adaptModel } from '../shared/modelAdapter'
+import { adaptModel } from '../../shared/modelAdapter'
 
 // ============================================
 // LOGGING SYSTEM
@@ -323,7 +323,7 @@ class BIMFragmentViewer {
       // delegate to shared raycast helper
       try {
         // Lazy import shared helper to avoid bundling issues
-        const helper = await import('../shared/raycastHelper')
+        const helper = await import('../../shared/raycastHelper')
         const result = await helper.performSelectionFromEvent(e as MouseEvent, this.container, this.world.camera.three, this.loadedModels, this.fragments)
         if (result && result.expressID) {
           await this.selectElement(result.expressID, result.object)
