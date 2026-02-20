@@ -362,3 +362,44 @@ if (window.innerWidth < 768) {
 
 console.log("BIM Mobile Viewer initialized successfully!");
 console.log("Click 'Load Models' to load the sample BIM models.");
+
+// Attach shared raycast helper to container clicks (best-effort)
+;(async () => {
+  const containerEl = document.getElementById('container')
+  if (!containerEl) return
+
+  containerEl.addEventListener('click', async (e) => {
+    try {
+      const helper = await import('../../shared/raycastHelper')
+      const camera = world.camera.three
+      const loadedModelsMap = new Map<string, any>()
+
+      // build loaded model map from fragments.groups
+      try {
+        for (const [id, group] of fragments.groups) {
+          loadedModelsMap.set(String(id), group)
+        }
+      } catch (err) {
+        // ignore
+      }
+
+      const result = await helper.performSelectionFromEvent(e as MouseEvent, containerEl as HTMLElement, camera, loadedModelsMap, fragments)
+      if (result && result.expressID) {
+        console.log('Selected element:', result.expressID)
+        // attempt highlight using fragments.highlight
+        try {
+          const map = new Map();
+          // best-effort: try to use model id if provided
+          if (result.modelId) map.set(result.modelId, new Set([result.expressID]));
+          else for (const [k] of loadedModelsMap) { map.set(k, new Set([result.expressID])); break }
+          fragments.highlight({ r: 0, g: 1, b: 0, a: 1 }, map)
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (err) {
+      console.warn('Shared raycast helper failed (mobile):', err)
+    }
+  })
+})()
+
