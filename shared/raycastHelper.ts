@@ -1,7 +1,17 @@
-import * as THREE from 'three'
-import { adaptModel, FragmentModel } from './modelAdapter'
+// Avoid importing three at shared-level to keep shared module buildable by subprojects that may have different three versions.
+import type * as THREE from 'three'
+import { adaptModel } from './modelAdapter'
 
-const raycaster = new THREE.Raycaster()
+let raycaster: any = null
+function ensureRaycaster(): any {
+  if (!raycaster) {
+    // dynamic require to avoid bundling issues
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Three = require('three')
+    raycaster = new Three.Raycaster()
+  }
+  return raycaster
+}
 
 export async function performSelectionFromEvent(event: MouseEvent, container: HTMLElement, camera: any, loadedModels: Map<string, any>, fragments: any) {
   if (loadedModels.size === 0) return null
@@ -15,9 +25,9 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
   try {
     if (fragments && fragments.core && typeof fragments.core.raycastFirst === 'function') {
       // Build a ray object compatible with fragments.core (min surface). We'll pass camera/world info
-      raycaster.setFromCamera(mouse, camera)
-      const origin = raycaster.ray.origin.clone()
-      const direction = raycaster.ray.direction.clone()
+      ensureRaycaster().setFromCamera(mouse, camera)
+      const origin = ensureRaycaster().ray.origin.clone()
+      const direction = ensureRaycaster().ray.direction.clone()
 
       // fragments.core.raycastFirst usually expects a Ray and a material or options
       const hit = fragments.core.raycastFirst({ origin, direction }, /* options */ 0)
@@ -28,7 +38,7 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
           const ids = adapted.getIds ? adapted.getIds() : []
           // crude mapping attempt: find closest model where bbox contains hit.point
           if (model.object) {
-            const bbox = new THREE.Box3().setFromObject(model.object)
+            const bbox = new (require("three")).Box3().setFromObject(model.object)
             if (bbox.containsPoint(hit.point)) {
               // if instanced, try instance->id mapping
               if (hit.instanceId !== undefined && Array.isArray(ids) && ids.length > hit.instanceId) {
@@ -61,14 +71,14 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
     }
   }
 
-  raycaster.setFromCamera(mouse, camera)
+  ensureRaycaster().setFromCamera(mouse, camera)
 
   const modelObjects: THREE.Object3D[] = []
   for (const model of loadedModels.values()) {
     if (model.object) modelObjects.push(model.object)
   }
 
-  const intersects = raycaster.intersectObjects(modelObjects, true)
+  const intersects = ensureRaycaster().intersectObjects(modelObjects, true)
   if (intersects.length > 0) {
     const intersect = intersects[0]
 
@@ -100,7 +110,7 @@ async function getExpressIdFromIntersection(intersect: THREE.Intersection, loade
         // as a best-effort, check if the point is in the model bbox
         try {
           if (model.object) {
-            const bbox = new THREE.Box3().setFromObject(model.object)
+            const bbox = new (require("three")).Box3().setFromObject(model.object)
             if (bbox.containsPoint(intersect.point)) return ids[intersect.instanceId]
           }
         } catch (e) {

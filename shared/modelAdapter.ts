@@ -1,7 +1,7 @@
-import * as THREE from 'three'
+// Shared model adapter — avoid importing Three.js types to keep this file buildable from multiple subprojects.
 
 export type FragmentModel = {
-  object?: THREE.Object3D
+  object?: any
   getIds?: () => number[]
   getAllIds?: () => number[]
   getProperties?: (id: number) => Promise<any>
