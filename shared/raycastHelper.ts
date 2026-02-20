@@ -5,29 +5,45 @@ declare const require: any
 
 let raycaster: any = null
 let ThreeConstructor: any = null
-function ensureRaycasterAsync(): any {
+async function ensureRaycasterAsync(): Promise<any> {
   if (!raycaster) {
     if (!ThreeConstructor) {
-      const Three = require('three');
-      ThreeConstructor = Three
+      if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+        const mod = await import('three')
+        ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
+      } else {
+        // Node environment
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        ThreeConstructor = require('three')
+      }
     }
     raycaster = new ThreeConstructor.Raycaster()
   }
   return raycaster
 }
 
-function getBox3Async(): any {
+async function getBox3Async(): Promise<any> {
   if (!ThreeConstructor) {
-    const Three = require('three')
-    ThreeConstructor = Three
+    if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+      const mod = await import('three')
+      ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      ThreeConstructor = require('three')
+    }
   }
   return ThreeConstructor.Box3
 }
 
-function getThreeAsync(): any {
+async function getThreeAsync(): Promise<any> {
   if (!ThreeConstructor) {
-    const Three = require('three')
-    ThreeConstructor = Three
+    if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+      const mod = await import('three')
+      ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      ThreeConstructor = require('three')
+    }
   }
   return ThreeConstructor
 }
