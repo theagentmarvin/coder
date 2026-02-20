@@ -382,10 +382,9 @@ console.log("Click 'Load Models' to load the sample BIM models.");
         // attempt highlight using fragments.highlight
         try {
           const map = new Map();
-          // best-effort: try to use model id if provided
-          if (result.modelId) map.set(result.modelId, new Set([result.expressID]));
-          else for (const [k] of loadedModelsMap) { map.set(k, new Set([result.expressID])); break }
-          fragments.highlight? fragments.highlight({ r: 0, g: 1, b: 0, a: 1 }, map) : null
+          // use first loaded model for highlight (best-effort for mobile)
+          for (const [k] of loadedModelsMap) { map.set(k, new Set([result.expressID])); break }
+          ;(fragments as any).highlight?.({ r: 0, g: 1, b: 0, a: 1 }, map)
         } catch (e) {
           // ignore
         }

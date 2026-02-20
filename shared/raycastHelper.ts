@@ -9,7 +9,7 @@ async function ensureRaycasterAsync(): Promise<any> {
   if (!raycaster) {
     if (!ThreeConstructor) {
       if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
-        const mod = await import('three')
+        const mod = await (import('three' as any) as Promise<any>)
         ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
       } else {
         // Node environment
@@ -25,7 +25,7 @@ async function ensureRaycasterAsync(): Promise<any> {
 async function getBox3Async(): Promise<any> {
   if (!ThreeConstructor) {
     if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
-      const mod = await import('three')
+      const mod = await (import('three' as any) as Promise<any>)
       ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
     } else {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -38,7 +38,7 @@ async function getBox3Async(): Promise<any> {
 async function getThreeAsync(): Promise<any> {
   if (!ThreeConstructor) {
     if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
-      const mod = await import('three')
+      const mod = await (import('three' as any) as Promise<any>)
       ThreeConstructor = (mod && (mod as any).default) ? (mod as any).default : mod
     } else {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -139,7 +139,7 @@ async function getExpressIdFromIntersection(intersect: any, loadedModels: Map<st
 
   if (intersect.instanceId !== undefined) {
     // map instanceId to expressID using model.getIds or adapter
-    for (const [modelId, model] of loadedModels) {
+    for (const [, model] of loadedModels) {
       const adapted = adaptModel(model)
       const ids = adapted.getIds ? adapted.getIds() : adapted.getAllIds ? adapted.getAllIds() : []
       if (ids && ids.length > intersect.instanceId) {
