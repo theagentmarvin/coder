@@ -1,13 +1,14 @@
 import { adaptModel } from './modelAdapter'
 
-// Don't import 'three' at top-level — use dynamic imports at runtime to avoid
-// build/type issues across subprojects. ensureRaycasterAsync lazily loads three.
+// Use require dynamically to avoid TypeScript requiring @types/three in every subproject
+declare const require: any
+
 let raycaster: any = null
 let ThreeConstructor: any = null
-async function ensureRaycasterAsync(): Promise<any> {
+function ensureRaycasterAsync(): any {
   if (!raycaster) {
     if (!ThreeConstructor) {
-      const Three = await import('three')
+      const Three = require('three');
       ThreeConstructor = Three
     }
     raycaster = new ThreeConstructor.Raycaster()
@@ -15,17 +16,17 @@ async function ensureRaycasterAsync(): Promise<any> {
   return raycaster
 }
 
-async function getBox3Async(): Promise<any> {
+function getBox3Async(): any {
   if (!ThreeConstructor) {
-    const Three = await import('three')
+    const Three = require('three')
     ThreeConstructor = Three
   }
   return ThreeConstructor.Box3
 }
 
-async function getThreeAsync(): Promise<any> {
+function getThreeAsync(): any {
   if (!ThreeConstructor) {
-    const Three = await import('three')
+    const Three = require('three')
     ThreeConstructor = Three
   }
   return ThreeConstructor
@@ -35,7 +36,7 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
   if (loadedModels.size === 0) return null
 
   const rect = container.getBoundingClientRect()
-  const Three = await getThreeAsync()
+  const Three = getThreeAsync();
   const mouse = new Three.Vector2()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -92,7 +93,7 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
 
   const rc = await ensureRaycasterAsync(); rc.setFromCamera(mouse, camera);
 
-  const modelObjects: THREE.Object3D[] = []
+  const modelObjects: any[] = []
   for (const model of loadedModels.values()) {
     if (model.object) modelObjects.push(model.object)
   }
@@ -109,7 +110,7 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
   return null
 }
 
-async function getExpressIdFromIntersection(intersect: THREE.Intersection, loadedModels: Map<string, any>) {
+async function getExpressIdFromIntersection(intersect: any, loadedModels: Map<string, any>) {
   let obj: any = intersect.object
 
   while (obj) {
