@@ -510,11 +510,30 @@ class BIMFragmentViewer {
       let elementData: any = null
 
       for (const [modelId, model] of this.loadedModels) {
-        // Try to get element info from the model
-        const elementInfo = await this.getElementInfo(model, expressID)
-        if (elementInfo) {
-          elementData = elementInfo
-          elementData.modelId = modelId
+        const adapted = adaptModel(model)
+        // Try to get element info from the adapter
+        if (adapted.getProperties) {
+          try {
+            const info = await adapted.getProperties(expressID)
+            if (info) {
+              elementData = info
+              elementData.modelId = modelId
+              break
+            }
+          } catch (e) {
+            // ignore per-model property errors
+          }
+        }
+
+        // fallback: if the model reports the id exists, build a minimal info object
+        const ids = adapted.getIds ? adapted.getIds() : []
+        if (ids.includes(expressID)) {
+          elementData = {
+            expressID,
+            name: adapted.getName ? adapted.getName(expressID) : `Element ${expressID}`,
+            type: adapted.getType ? adapted.getType(expressID) : 'Unknown',
+            modelId,
+          }
           break
         }
       }
@@ -565,24 +584,25 @@ class BIMFragmentViewer {
   }
 
   private async getElementInfo(model: any, expressID: number): Promise<any> {
-    // Try to get element info from the fragment model
+    // Try to get element info from the fragment model using the adapter
     try {
-      // Check if model has getProperties or similar method
-      if (model.getProperties) {
-        return await model.getProperties(expressID)
+      const adapted = adaptModel(model)
+
+      if (adapted.getProperties) {
+        try {
+          return await adapted.getProperties(expressID)
+        } catch (e) {
+          // ignore per-model property errors
+        }
       }
 
-      // Check if model has getElementData or similar
-      if (model.getElementData) {
-        return await model.getElementData(expressID)
-      }
-
-      // Try to get basic info from model metadata
-      if (model.getIds && model.getIds().includes(expressID)) {
+      // fallback to basic metadata
+      const ids = adapted.getIds ? adapted.getIds() : []
+      if (ids.includes(expressID)) {
         return {
           expressID,
-          name: model.getName ? model.getName(expressID) : `Element ${expressID}`,
-          type: model.getType ? model.getType(expressID) : 'Unknown',
+          name: adapted.getName ? adapted.getName(expressID) : `Element ${expressID}`,
+          type: adapted.getType ? adapted.getType(expressID) : 'Unknown',
         }
       }
     } catch (e) {
