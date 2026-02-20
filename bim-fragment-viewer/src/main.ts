@@ -210,12 +210,30 @@ class BIMFragmentViewer {
       this.fragments.core.update()
     })
 
-    // Fix z-fighting on materials
+    // Fix z-fighting on materials (deterministic)
     this.fragments.core.models.materials.list.onItemSet.add(({ value: material }: any) => {
       if (!('isLodMaterial' in material && material.isLodMaterial)) {
         material.polygonOffset = true
         material.polygonOffsetUnits = 1
-        material.polygonOffsetFactor = Math.random()
+        // Use a small deterministic offset instead of Math.random() which causes non-deterministic visuals
+        material.polygonOffsetFactor = 1
+      }
+    })
+
+    // Log model capabilities when a model is added (helps debugging missing APIs)
+    this.fragments.list.onItemSet.add(({ value: model }: any) => {
+      try {
+        const caps: any = {
+          id: model.modelId,
+          hasGetIds: typeof model.getIds === 'function',
+          hasGetAllIds: typeof model.getAllIds === 'function',
+          hasGetProperties: typeof model.getProperties === 'function',
+          hasGetElementData: typeof model.getElementData === 'function',
+          hasObject: !!model.object,
+        }
+        console.log('[Fragments] Model capabilities:', caps)
+      } catch (e) {
+        // ignore
       }
     })
   }
@@ -262,7 +280,21 @@ class BIMFragmentViewer {
     this.clearSearchBtn.addEventListener('click', () => this.clearSearch())
 
     // Click handler for 3D selection
-    this.container.addEventListener('click', (e) => this.handle3DClick(e))
+    this.container.addEventListener('click', async (e) => {
+      // delegate to shared raycast helper
+      try {
+        // Lazy import shared helper to avoid bundling issues
+        const helper = await import('../shared/raycastHelper')
+        const result = await helper.performSelectionFromEvent(e as MouseEvent, this.container, this.world.camera.three, this.loadedModels, this.fragments)
+        if (result && result.expressID) {
+          await this.selectElement(result.expressID, result.object)
+          return
+        }
+      } catch (err) {
+        console.warn('Shared raycast helper failed, falling back to local handler', err)
+        this.handle3DClick(e as MouseEvent)
+      }
+    })
   }
 
   private enableSearchUI() {
