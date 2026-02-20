@@ -26,6 +26,13 @@ try {
   world.scene.setup();
   world.scene.three.background = null;
 
+// Log fragments model capabilities when groups are added
+fragments.groups.onItemSet.add(({value:group})=>{
+  try{
+    console.log("[Fragments-Mobile] group added:", group.name || group.id || group.groupId)
+  }catch(e){}
+})
+
   const container = document.getElementById("container")!;
   world.renderer = new OBC.SimpleRenderer(components, container);
   world.camera = new OBC.OrthoPerspectiveCamera(components);

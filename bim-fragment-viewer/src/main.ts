@@ -191,12 +191,50 @@ class BIMFragmentViewer {
   }
 
   private async initFragmentsWorker() {
-    // Fetch worker from CDN
+    // Try to fetch worker from CDN with a local fallback
     const githubUrl = 'https://thatopen.github.io/engine_fragment/resources/worker.mjs'
-    console.log(`Fetching worker from: ${githubUrl}`)
+    console.log(`Attempting to fetch worker from CDN: ${githubUrl}`)
 
-    const fetchedUrl = await fetch(githubUrl)
-    const workerBlob = await fetchedUrl.blob()
+    let workerBlob: Blob | null = null
+    try {
+      const fetchedUrl = await fetch(githubUrl)
+      if (fetchedUrl.ok) {
+        workerBlob = await fetchedUrl.blob()
+        console.log('✅ Fetched worker from CDN')
+      } else {
+        console.warn('CDN worker fetch returned non-ok:', fetchedUrl.status)
+      }
+    } catch (cdnErr) {
+      console.warn('CDN worker fetch failed:', cdnErr)
+    }
+
+    // If CDN failed, try local paths
+    if (!workerBlob) {
+      const localCandidates = [
+        '/resources/worker.mjs',
+        '/public/worker.mjs',
+        './resources/worker.mjs',
+      ]
+      for (const p of localCandidates) {
+        try {
+          console.log(`Trying local worker path: ${p}`)
+          const resp = await fetch(p)
+          if (resp.ok) {
+            workerBlob = await resp.blob()
+            console.log('✅ Loaded local worker:', p)
+            break
+          }
+        } catch (localErr) {
+          // ignore and try next
+        }
+      }
+    }
+
+    if (!workerBlob) {
+      console.error('❌ Could not load fragments worker from CDN or local fallback. Fragments may not function correctly.')
+      return
+    }
+
     const workerFile = new File([workerBlob], 'worker.mjs', {
       type: 'text/javascript',
     })
