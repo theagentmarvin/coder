@@ -1,0 +1,24 @@
+{
+  "name": "bim-fragment-viewer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@thatopen/components": "^3.3.2",
+    "@thatopen/fragments": "^3.3.4",
+    "@thatopen/ui": "^3.3.3",
+    "stats.js": "^0.17.0",
+    "three": "^0.182.0",
+    "web-ifc": "^0.0.75"
+  }
+}

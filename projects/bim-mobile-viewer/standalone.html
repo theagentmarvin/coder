@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Mobile optimization: prevent zoom/pinch conflicts, proper viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>BIM Mobile Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a1a;
+      position: fixed;
+      overscroll-behavior: none;
+    }
+    
+    #container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #1a1a1a;
+    }
+
+    /* Progress Bar Styles */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    
+    .loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(33, 150, 243, 0.2);
+      border-top-color: #2196F3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: #fff;
+      font-size: 16px;
+      margin-top: 20px;
+      font-weight: 500;
+    }
+    
+    .loading-subtext {
+      color: #888;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    
+    .progress-container {
+      width: 280px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 24px;
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #2196F3, #21CBF3);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .progress-text {
+      color: #666;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+    
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 1; transform: translateX(-50%) translateY(0); }
+      to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+
+    /* Desktop Panel Styles */
+    .options-menu {
+      position: absolute !important;
+      top: 10px !important;
+      right: 10px !important;
+      width: 320px !important;
+      max-height: calc(100vh - 20px) !important;
+      overflow-y: auto !important;
+    }
+    
+    .phone-menu-toggler {
+      display: none !important;
+    }
+    
+    /* Mobile Styles */
+    @media (max-width: 768px) {
+      .options-menu {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-height: 60vh !important;
+        transform: translateY(100%) !important;
+        transition: transform 0.3s ease !important;
+        border-radius: 16px 16px 0 0 !important;
+        z-index: 999 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .options-menu.options-menu-visible {
+        transform: translateY(0) !important;
+      }
+      
+      .phone-menu-toggler {
+        display: flex !important;
+        position: fixed !important;
+        bottom: max(20px, env(safe-area-inset-bottom)) !important;
+        right: 20px !important;
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 50% !important;
+        background: #2196F3 !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+        z-index: 1000 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 24px !important;
+        border: none !important;
+        cursor: pointer !important;
+        touch-action: manipulation;
+      }
+      
+      .phone-menu-toggler:active {
+        transform: scale(0.95);
+        background: #1976D2 !important;
+      }
+      
+      bim-button { min-height: 48px !important; font-size: 16px !important; }
+      bim-table { font-size: 14px !important; }
+      bim-table th, bim-table td { padding: 12px 8px !important; min-width: 80px; }
+      bim-panel, bim-panel-section, bim-button { user-select: none !important; -webkit-user-select: none !important; }
+      bim-table tr { min-height: 44px; }
+      .stats-container { display: none !important; }
+    }
+    
+    @media (max-width: 480px) {
+      .options-menu { max-height: 70vh !important; }
+      bim-panel-section[label="Controls"] { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+      bim-button { width: 100% !important; }
+      bim-table { font-size: 12px !important; }
+      bim-table th, bim-table td { padding: 10px 6px !important; }
+      .progress-container { width: 220px; }
+    }
+    
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .options-menu { width: 280px !important; }
+    }
+    
+    @media (max-width: 768px) and (orientation: landscape) {
+      .options-menu { max-height: 50vh !important; }
+    }
+    
+    .panel-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 998;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .panel-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Selection info panel */
+    .selection-info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(26, 26, 26, 0.95);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px;
+      color: #fff;
+      font-size: 13px;
+      max-width: 250px;
+      z-index: 100;
+      display: none;
+    }
+    
+    .selection-info.visible {
+      display: block;
+    }
+    
+    .selection-info .title {
+      font-weight: 600;
+      color: #2196F3;
+      margin-bottom: 8px;
+    }
+    
+    .selection-info .property {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+    
+    .selection-info .property-name {
+      color: #888;
+    }
+    
+    .selection-info .property-value {
+      color: #fff;
+    }
+  </style>
+  <!-- Import Map for Three.js and That Open - v2.0.0 for fragments.init() compatibility -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.1/examples/jsm/",
+      "@thatopen/components": "https://unpkg.com/@thatopen/components@2.0.0/dist/index.mjs",
+      "@thatopen/ui": "https://unpkg.com/@thatopen/ui@2.0.0/dist/index.js",
+      "stats.js": "https://unpkg.com/stats.js@0.17.0/build/stats.min.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- Loading Overlay with Progress Bar -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading BIM Models</div>
+    <div class="loading-subtext" id="loadingSubtext">Initializing...</div>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">0%</div>
+  </div>
+
+  <div id="container"></div>
+  
+  <!-- Selection Info Panel -->
+  <div class="selection-info" id="selectionInfo">
+    <div class="title">Selected Element</div>
+    <div id="selectionContent"></div>
+  </div>
+  
+  <div class="panel-backdrop" id="panelBackdrop"></div>
+
+  <script type="module">
+    import Stats from "stats.js";
+    import * as BUI from "@thatopen/ui";
+    import * as OBC from "@thatopen/components";
+    import * as THREE from "three";
+
+    // Initialize BUI Manager
+    BUI.Manager.init();
+
+    let components, world, fragments, highlighter;
+
+    try {
+      // Create components instance
+      components = new OBC.Components();
+
+      // Setup world with proper typing
+      const worlds = components.get(OBC.Worlds);
+      world = worlds.create();
+
+      world.scene = new OBC.SimpleScene(components);
+      world.scene.setup();
+      world.scene.three.background = new THREE.Color(0x1a1a1a);
+
+      const container = document.getElementById("container");
+      world.renderer = new OBC.SimpleRenderer(components, container);
+      world.camera = new OBC.OrthoPerspectiveCamera(components);
+
+      // Initialize components
+      components.init();
+
+      // Add grid
+      components.get(OBC.Grids).create(world);
+
+      // Get FragmentsManager
+      fragments = components.get(OBC.FragmentsManager);
+
+      // Setup Highlighter for item selection
+      highlighter = components.get(OBC.Highlighter);
+      highlighter.setup({ world });
+    } catch (error) {
+      console.error("Failed to initialize OBC components:", error);
+      document.getElementById("loadingSubtext").textContent = "Error: " + error.message;
+      throw error;
+    }
+
+    // Track loading state
+    let fragmentsLoaded = false;
+    let loadingInProgress = true;
+    let loadedModelIds = [];
+    let currentProgress = 0;
+
+    // Update loading progress
+    const updateProgress = (percent, text) => {
+      currentProgress = percent;
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const loadingSubtext = document.getElementById('loadingSubtext');
+      
+      if (progressBar) progressBar.style.width = `${percent}%`;
+      if (progressText) progressText.textContent = `${Math.round(percent)}%`;
+      if (loadingSubtext && text) loadingSubtext.textContent = text;
+    };
+
+    // Hide loading overlay
+    const hideLoadingOverlay = () => {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+      }
+      loadingInProgress = false;
+      updateUI();
+    };
+
+    // Load fragments models automatically on page start
+    const loadFragments = async () => {
+      if (loadingInProgress && fragmentsLoaded) return;
+      
+      const fragPaths = [
+        { path: "https://thatopen.github.io/engine_components/resources/frags/school_arq.frag", name: "school_arq" },
+        { path: "https://thatopen.github.io/engine_components/resources/frags/school_str.frag", name: "school_str" }
+      ];
+
+      const totalModels = fragPaths.length;
+
+      try {
+        for (let i = 0; i < fragPaths.length; i++) {
+          const { path, name } = fragPaths[i];
+          
+          if (loadedModelIds.includes(name)) continue;
+
+          updateProgress((i / totalModels) * 80, `Loading ${name}...`);
+
+          const file = await fetch(path);
+          const buffer = await file.arrayBuffer();
+          const data = new Uint8Array(buffer);
+
+          // Load the fragment
+          const group = fragments.load(data, {
+            name: name,
+            coordinate: true,
+          });
+
+          // Add to scene
+          world.scene.three.add(group);
+          loadedModelIds.push(name);
+
+          console.log(`Loaded model: ${name}`, group);
+        }
+
+        updateProgress(90, 'Processing geometry...');
+
+        // Fit camera to scene after loading
+        const meshes = [];
+        fragments.groups.forEach((group) => {
+          group.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              meshes.push(child);
+            }
+          });
+        });
+        
+        if (meshes.length > 0) {
+          await world.camera.fit(meshes, 0.5);
+        }
+
+        updateProgress(100, 'Complete!');
+        fragmentsLoaded = true;
+        
+        // Hide loading overlay after a brief delay
+        setTimeout(() => {
+          hideLoadingOverlay();
+          showNotification("Models loaded successfully!");
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error loading fragments:", error);
+        updateProgress(0, 'Error loading models');
+        showNotification("Error loading models", true);
+        hideLoadingOverlay();
+      }
+    };
+
+    // Delete architectural model
+    const deleteArchModel = () => {
+      for (const [id, group] of fragments.groups) {
+        if (/arq/.test(id)) {
+          fragments.disposeGroup(group);
+          loadedModelIds = loadedModelIds.filter((mid) => mid !== id);
+        }
+      }
+      if (fragments.groups.size === 0) {
+        fragmentsLoaded = false;
+      }
+      updateUI();
+    };
+
+    // Delete all models
+    const deleteAllModels = () => {
+      const groups = [...fragments.groups.values()];
+      for (const group of groups) {
+        fragments.disposeGroup(group);
+      }
+      loadedModelIds = [];
+      fragmentsLoaded = false;
+      updateUI();
+    };
+
+    // Export fragments
+    const downloadFragments = async () => {
+      for (const [id, group] of fragments.groups) {
+        const fragsBuffer = fragments.export(group);
+        const blob = new Blob([fragsBuffer], { type: "application/octet-stream" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${id}.frag`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+    };
+
+    // Handle selection change
+    const updateSelectionInfo = (selection) => {
+      const selectionInfo = document.getElementById('selectionInfo');
+      const selectionContent = document.getElementById('selectionContent');
+      
+      if (!selection || Object.keys(selection).length === 0) {
+        selectionInfo.classList.remove('visible');
+        return;
+      }
+
+      // Get the first selected fragment
+      const fragmentID = Object.keys(selection)[0];
+      const itemIDs = selection[fragmentID];
+      
+      if (!itemIDs || itemIDs.size === 0) {
+        selectionInfo.classList.remove('visible');
+        return;
+      }
+
+      const itemID = Array.from(itemIDs)[0];
+      
+      // Get fragment and property data
+      const fragment = fragments.list.get(fragmentID);
+      let propertiesHTML = '';
+      
+      if (fragment) {
+        // Try to get properties from fragment
+        const data = fragment.get(itemID);
+        if (data) {
+          propertiesHTML = `
+            <div class="property">
+              <span class="property-name">ID:</span>
+              <span class="property-value">${itemID}</span>
+            </div>
+            <div class="property">
+              <span class="property-name">Fragment:</span>
+              <span class="property-value">${fragmentID.substring(0, 20)}...</span>
+            </div>
+          `;
+        }
+      }
+
+      selectionContent.innerHTML = propertiesHTML || `
+        <div class="property">
+          <span class="property-name">ID:</span>
+          <span class="property-value">${itemID}</span>
+        </div>
+      `;
+      
+      selectionInfo.classList.add('visible');
+    };
+
+    // Listen for selection events
+    highlighter.events.select.onHighlight.add((selection) => {
+      updateSelectionInfo(selection);
+    });
+
+    highlighter.events.select.onClear.add(() => {
+      const selectionInfo = document.getElementById('selectionInfo');
+      selectionInfo.classList.remove('visible');
+    });
+
+    // Create UI Panel
+    let panel;
+
+    const [panelComponent, updatePanel] = BUI.Component.create((_) => {
+      // Loading indicator (only shown during initial load)
+      let loadingIndicator;
+      if (loadingInProgress) {
+        loadingIndicator = BUI.html`
+          <div style="padding: 12px; text-align: center; color: #666;">
+            <div class="loading-spinner" style="width: 24px; height: 24px; border-width: 2px;"></div>
+            <span style="font-size: 13px; margin-top: 8px; display: block;">Loading models...</span>
+          </div>
+        `;
+      }
+
+      // Dispose architectural model button
+      let disposeArchModelBtn;
+      if ([...fragments.groups.keys()].some((key) => /arq/.test(key))) {
+        disposeArchModelBtn = BUI.html`
+          <bim-button 
+            label="Remove Arch Model" 
+            icon="solar:trash-bin-trash-bold"
+            @click=${deleteArchModel}>
+          </bim-button>
+        `;
+      }
+
+      // Download and dispose all buttons - only when models exist
+      let downloadFragmentsBtn;
+      let disposeModelsBtn;
+      if (fragments.groups.size > 0) {
+        disposeModelsBtn = BUI.html`
+          <bim-button 
+            label="Remove All Models" 
+            icon="solar:trash-bin-2-bold"
+            @click=${deleteAllModels}
+            style="--bim-button-bg: #f44336;">
+          </bim-button>
+        `;
+
+        downloadFragmentsBtn = BUI.html`
+          <bim-button 
+            label="Export Models" 
+            icon="solar:file-download-bold"
+            @click=${downloadFragments}>
+          </bim-button>
+        `;
+      }
+
+      // Properties table section - only visible after fragments loaded
+      let propertiesSection;
+      if (fragmentsLoaded) {
+        propertiesSection = BUI.html`
+          <bim-panel-section label="Model Information" collapsed>
+            <div style="padding: 8px; font-size: 13px; color: #666;">
+              <div style="margin-bottom: 8px;">
+                <strong>Status:</strong> 
+                <span style="color: #4CAF50;">● Loaded</span>
+              </div>
+              <div style="margin-bottom: 8px;">
+                <strong>Models:</strong> ${fragments.groups.size}
+              </div>
+              <div>
+                <strong>Fragments:</strong> ${fragments.list.size}
+              </div>
+            </div>
+          </bim-panel-section>
+        `;
+      }
+
+      // Model info section - shows list of loaded models
+      let modelInfoSection;
+      if (fragments.groups.size > 0) {
+        modelInfoSection = BUI.html`
+          <bim-panel-section label="Loaded Models" collapsed>
+            <div style="padding: 8px; font-size: 13px; color: #666;">
+              ${[...fragments.groups.keys()].map((id) =>
+                BUI.html`<div style="padding: 4px 0; display: flex; align-items: center; gap: 8px;">
+                  <span style="color: #4CAF50;">●</span>
+                  ${id}
+                </div>`
+              )}
+            </div>
+          </bim-panel-section>
+        `;
+      }
+
+      // Instructions section
+      let instructionsSection;
+      if (fragmentsLoaded) {
+        instructionsSection = BUI.html`
+          <bim-panel-section label="Controls" collapsed>
+            <div style="padding: 8px; font-size: 12px; color: #888;">
+              <div style="margin-bottom: 4px;">🖱️ <strong>Left Click:</strong> Select element</div>
+              <div style="margin-bottom: 4px;">🖱️ <strong>Right Click:</strong> Pan</div>
+              <div style="margin-bottom: 4px;">🖱️ <strong>Scroll:</strong> Zoom</div>
+              <div>🖱️ <strong>Double Click:</strong> Fit view</div>
+            </div>
+          </bim-panel-section>
+        `;
+      }
+
+      return BUI.html`
+        <bim-panel active label="BIM Mobile Viewer" class="options-menu">
+          <bim-panel-section label="Controls">
+            ${loadingIndicator}
+            ${disposeArchModelBtn}
+            ${downloadFragmentsBtn}
+            ${disposeModelsBtn}
+          </bim-panel-section>
+          ${modelInfoSection}
+          ${propertiesSection}
+          ${instructionsSection}
+        </bim-panel>
+      `;
+    }, {});
+
+    panel = panelComponent;
+
+    // Function to update the entire UI
+    function updateUI() {
+      updatePanel();
+    }
+
+    // Listen for fragment changes
+    const updateFunction = () => updateUI();
+    fragments.groups.onItemSet.add(updateFunction);
+    fragments.groups.onItemDeleted.add(updateFunction);
+    fragments.onFragmentsLoaded.add(updateFunction);
+    fragments.onFragmentsDisposed.add(updateFunction);
+
+    document.body.append(panel);
+
+    // Mobile menu toggle button - always visible at bottom right
+    const menuButton = BUI.Component.create(() => {
+      return BUI.html`
+        <bim-button 
+          class="phone-menu-toggler" 
+          icon="solar:menu-dots-bold"
+          tooltip="Menu"
+          @click="${() => {
+            panel.classList.toggle("options-menu-visible");
+          }}">
+        </bim-button>
+      `;
+    });
+
+    document.body.append(menuButton);
+
+    // Notification system
+    function showNotification(message, isError = false) {
+      const notification = document.createElement("div");
+      notification.className = "mobile-notification";
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${isError ? "#f44336" : "#4CAF50"};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 24px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideDown 0.3s ease;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        notification.style.animation = "slideUp 0.3s ease";
+        setTimeout(() => notification.remove(), 300);
+      }, 3000);
+    }
+
+    // Stats for performance monitoring
+    const stats = new Stats();
+    stats.showPanel(2);
+    document.body.append(stats.dom);
+    stats.dom.style.left = "0px";
+    stats.dom.style.zIndex = "unset";
+    world.renderer.onBeforeUpdate.add(() => stats.begin());
+    world.renderer.onAfterUpdate.add(() => stats.end());
+
+    // Set initial camera position
+    world.camera.controls.setLookAt(78, 20, -2.2, 26, -4, 25);
+
+    // Disable stats on mobile (small screens)
+    if (window.innerWidth < 768) {
+      stats.dom.style.display = "none";
+    }
+
+    console.log("BIM Mobile Viewer initialized successfully!");
+    console.log("Auto-loading BIM models...");
+
+    // AUTO-LOAD FRAGMENTS ON PAGE START
+    loadFragments();
+  </script>
+</body>
+</html>

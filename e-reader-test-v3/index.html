@@ -1,0 +1,134 @@
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;Hyphen Test v3 E-reader&lt;/title&gt;
+    &lt;style&gt;
+        * {
+            box-sizing: border-box;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: serif;
+            font-size: 18px;
+            line-height: 1.6;
+            max-width: 42em;
+            margin: 0 auto;
+            padding: 2em 1em;
+            color: #333;
+            background: #fff;
+            text-align: justify;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            -moz-hyphens: auto;
+            orphans: 3;
+            widows: 3;
+        }
+        p {
+            text-align: justify;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            -moz-hyphens: auto;
+            orphans: 3;
+            widows: 3;
+            margin-bottom: 1.2em;
+        }
+        /* Drop cap */
+        p.dropcap::first-letter {
+            font-size: 3.5em;
+            line-height: 0.7;
+            float: left;
+            margin: 0.1em 0.15em 0 0;
+            font-weight: bold;
+        }
+        h1, h2 {
+            scroll-margin-top: 4em;
+        }
+        h1 {
+            font-size: 2em;
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.75em;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 1em;
+                font-size: 16px;
+            }
+        }
+        @media (max-width: 600px) {
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            tr {
+                border: 1px solid #ccc;
+                margin-bottom: 1em;
+                padding: 0.5em;
+                border-radius: 4px;
+                background: #f9f9f9;
+            }
+            td {
+                border: none;
+                border-bottom: 1px solid #eee;
+                position: relative;
+                padding-left: 50%;
+                padding-top: 0.5em;
+                padding-bottom: 0.5em;
+            }
+            td:before {
+                position: absolute;
+                left: 0.5em;
+                width: 45%;
+                padding-right: 1em;
+                white-space: nowrap;
+                font-weight: bold;
+                content: attr(data-label);
+            }
+            th {
+                display: none;
+            }
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Hyphen Test&lt;/h1&gt;
+    &lt;p class=&quot;dropcap&quot;&gt;Long words like &quot;internationalization&quot; should hyphenate. Orphans/widows fixed. Drop cap? &lt;strong&gt;Bold&lt;/strong&gt; table:&lt;/p&gt;
+    &lt;table&gt;
+        &lt;thead&gt;
+            &lt;tr&gt;
+                &lt;th&gt;Long-Word-Test&lt;/th&gt;
+                &lt;th&gt;Data&lt;/th&gt;
+            &lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+            &lt;tr&gt;
+                &lt;td data-label=&quot;Long-Word-Test&quot;&gt;Hyphenated&lt;/td&gt;
+                &lt;td data-label=&quot;Data&quot;&gt;Yes&lt;/td&gt;
+            &lt;/tr&gt;
+        &lt;/tbody&gt;
+    &lt;/table&gt;
+    &lt;p&gt;Additional paragraph to test orphans and widows. Short lines. Another.&lt;/p&gt;
+    &lt;p&gt;Internationally recognized standards apply here. Supercalifragilisticexpialidocious.&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;

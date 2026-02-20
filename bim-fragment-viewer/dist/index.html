@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BIM Fragment Viewer - ThatOpen Engine</title>
+    <script type="module" crossorigin src="./assets/index-C3mmLdKE.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C1MwL7rI.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1>🏗️ BIM Fragment Viewer</h1>
+        <div class="controls">
+          <input type="file" id="ifc-file-input" accept=".ifc" class="file-input" />
+          <button id="load-sample-btn" class="btn">Load Sample IFC</button>
+          <button id="clear-logs-btn" class="btn btn-secondary">Clear Logs</button>
+        </div>
+      </header>
+      
+      <div class="main-container">
+        <aside class="logs-panel">
+          <div class="logs-header">
+            <h2>📋 Live Logs</h2>
+            <span class="log-count" id="log-count">0 entries</span>
+          </div>
+          <div class="logs-content" id="logs-content">
+            <div class="log-entry info">
+              <span class="timestamp">--:--:--</span>
+              <span class="message">Welcome! Load an IFC file to start...</span>
+            </div>
+          </div>
+        </aside>
+        
+        <main class="viewer-panel">
+          <div id="viewer-container"></div>
+          <div class="search-panel" id="search-panel">
+            <input 
+              type="text" 
+              id="search-input" 
+              placeholder="Search IFC elements (e.g., 'wall', 'door', 'window')..."
+              disabled
+            />
+            <button id="search-btn" class="btn" disabled>Search</button>
+            <button id="clear-search-btn" class="btn btn-secondary" disabled>Clear</button>
+          </div>
+          <div class="results-panel" id="results-panel"></div>
+          <div class="properties-panel" id="properties-panel">
+            <div class="properties-header">
+              <h3>📊 Properties</h3>
+              <span id="selected-element">No element selected</span>
+            </div>
+            <div class="properties-content" id="properties-content">
+              <p class="placeholder">Click on an element in the 3D view to see its properties</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    
+  </body>
+</html>
