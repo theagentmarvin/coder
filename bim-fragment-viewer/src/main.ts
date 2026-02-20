@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import * as OBC from '@thatopen/components'
 import Stats from 'stats.js'
 import './style.css'
+import { adaptModel } from '../shared/modelAdapter'
 
 // ============================================
 // LOGGING SYSTEM
