@@ -52,7 +52,7 @@ export async function performSelectionFromEvent(event: MouseEvent, container: HT
   if (loadedModels.size === 0) return null
 
   const rect = container.getBoundingClientRect()
-  const Three = getThreeAsync();
+  const Three = await getThreeAsync();
   const mouse = new Three.Vector2()
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1

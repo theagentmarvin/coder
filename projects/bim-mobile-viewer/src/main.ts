@@ -26,13 +26,6 @@ try {
   world.scene.setup();
   world.scene.three.background = null;
 
-// Log fragments model capabilities when groups are added
-fragments.groups.onItemSet.add(({value:group})=>{
-  try{
-    console.log("[Fragments-Mobile] group added:", group.name || group.id || group.groupId)
-  }catch(e){}
-})
-
   const container = document.getElementById("container")!;
   world.renderer = new OBC.SimpleRenderer(components, container);
   world.camera = new OBC.OrthoPerspectiveCamera(components);
@@ -370,7 +363,7 @@ console.log("Click 'Load Models' to load the sample BIM models.");
 
   containerEl.addEventListener('click', async (e) => {
     try {
-      const helper = await import('../../shared/raycastHelper')
+      const helper = await import('../../../shared/raycastHelper')
       const camera = world.camera.three
       const loadedModelsMap = new Map<string, any>()
 
@@ -392,7 +385,7 @@ console.log("Click 'Load Models' to load the sample BIM models.");
           // best-effort: try to use model id if provided
           if (result.modelId) map.set(result.modelId, new Set([result.expressID]));
           else for (const [k] of loadedModelsMap) { map.set(k, new Set([result.expressID])); break }
-          fragments.highlight({ r: 0, g: 1, b: 0, a: 1 }, map)
+          fragments.highlight? fragments.highlight({ r: 0, g: 1, b: 0, a: 1 }, map) : null
         } catch (e) {
           // ignore
         }
