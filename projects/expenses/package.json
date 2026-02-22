@@ -1,0 +1,16 @@
+{
+  "name": "expenses",
+  "version": "1.0.0",
+  "description": "",
+  "main": "expense_excel.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "docx": "^9.5.3",
+    "xlsx": "^0.18.5"
+  }
+}
