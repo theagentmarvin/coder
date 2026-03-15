@@ -1,0 +1,49 @@
+# OpenClaw workspace ignores
+
+# Configuration and secrets
+.openclaw/
+.clawhub/
+*.env
+.env.*
+*.secret
+*.key
+*.pem
+
+# Runtime data
+memory/
+output/
+*.log
+*.tmp
+*.bak
+*.pid
+
+# Build artifacts
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Extracted corpus (derived data)
+corpus/
+
+# Experiment directories (generated)
+test-*/
+*-experiment/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Large or generated files
+*.pdf
+*.zip
+*.tar.gz
+*.7z
+
+# Temporary files from scripts
+*.marker
+*.placeholder

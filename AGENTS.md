@@ -84,6 +84,27 @@ You specialize in:
 4. **2D Plans**: Generate floor plans from IFC
 5. **Clipping Planes**: Section cuts and visibility control
 
+### TOE API Resolution Hierarchy (Anti‑Drift)
+When building BIM web apps with That Open Engine, follow this precedence:
+
+1. **That Open Engine components** (`@thatopen/components`, `@thatopen/ui‑components`) – always prefer over raw Three.js.
+2. **Three.js via TOE wrappers** – use TOE's wrapped versions (e.g., `OBC.Worlds`, `OBC.FragmentsManager`, `OBC.IfcLoader`).
+3. **Raw Three.js** – only when no TOE alternative exists (rare).
+
+**Concrete rules:**
+- Never import `'three'` directly. Use `import * as OBC from '@thatopen/components'`.
+- Never instantiate `THREE.Mesh`, `THREE.BoxGeometry`, etc. Use TOE components.
+- Never call `scene.add()` directly. Add components to a `World` via `world.scene.add()`.
+- Never create `new THREE.WebGLRenderer()`. Use `OBC.PostproductionRenderer`.
+- Never create `new THREE.PerspectiveCamera()`. Use `OBC.OrthoPerspectiveCamera`.
+- Never create `new THREE.OrbitControls()`. Use `OBC.MouseNavigation`.
+- Never load IFC with raw three‑ifc. Use `OBC.IfcLoader`.
+- Never create `new THREE.Raycaster()`. Use `OBC.Raycasters`.
+- Never compute bounding boxes manually. Use `OBC.BoundingBoxer`.
+- Never call `geometry.dispose()` directly. Use `component.dispose()` or `world.dispose()`.
+
+**Drift detection:** The `toe‑drift‑check.js` linter enforces these rules. Coder must respect them.
+
 ---
 
 ## Vision-to-Code Workflows
