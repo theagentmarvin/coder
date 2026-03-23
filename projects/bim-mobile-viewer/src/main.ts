@@ -377,20 +377,51 @@ console.log("Click 'Load Models' to load the sample BIM models.");
       }
 
       const result = await helper.performSelectionFromEvent(e as MouseEvent, containerEl as HTMLElement, camera, loadedModelsMap, fragments)
+
+      // ── Visual debug: draw ray as ArrowHelper for 1s ──
+      try {
+        const rc = new THREE.Raycaster()
+        const rect = containerEl.getBoundingClientRect()
+        const ndcMouse = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1,
+        )
+        rc.setFromCamera(ndcMouse, camera)
+        const arrow = new THREE.ArrowHelper(
+          rc.ray.direction,
+          rc.ray.origin,
+          200,   // length
+          0xff0000, // red
+          3,     // headLength
+          2,     // headWidth
+        )
+        world.scene.three.add(arrow)
+        console.log('[Raycast] visual debug arrow added at:', rc.ray.origin.toArray(), 'dir:', rc.ray.direction.toArray())
+        setTimeout(() => {
+          world.scene.three.remove(arrow)
+          arrow.dispose?.()
+        }, 1000)
+      } catch (arrowErr) {
+        console.warn('[Raycast] could not add debug arrow:', arrowErr)
+      }
+
       if (result && result.expressID) {
-        console.log('Selected element:', result.expressID)
+        console.log('[Raycast] Selected element:', result.expressID)
         // attempt highlight using fragments.highlight
         try {
           const map = new Map();
           // use first loaded model for highlight (best-effort for mobile)
           for (const [k] of loadedModelsMap) { map.set(k, new Set([result.expressID])); break }
           ;(fragments as any).highlight?.({ r: 0, g: 1, b: 0, a: 1 }, map)
+          console.log('[Raycast] highlight applied for expressID:', result.expressID)
         } catch (e) {
-          // ignore
+          console.warn('[Raycast] highlight failed:', e)
         }
+      } else {
+        console.log('[Raycast] no element hit (result is null or missing expressID)')
       }
     } catch (err) {
-      console.warn('Shared raycast helper failed (mobile):', err)
+      console.warn('[Raycast] Shared raycast helper failed (mobile):', err)
     }
   })
 })()

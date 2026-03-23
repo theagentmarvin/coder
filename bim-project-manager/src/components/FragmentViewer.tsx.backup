@@ -1,0 +1,425 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import * as OBC from '@thatopen/components';
+import { RenderedFaces, toClassicWorker } from '@thatopen/fragments';
+import { Vector2, Color, type PerspectiveCamera, Raycaster } from 'three';
+import PropertiesPanel from './PropertiesPanel';
+
+const IFC_URL = '/models/small.ifc';
+
+export default function FragmentViewer() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const componentsRef = useRef<OBC.Components | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Properties panel state
+  const [selectedItemData, setSelectedItemData] = useState<any[] | null>(null);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+  const fragmentsRef = useRef<any>(null);
+
+  // Keep the latest state-setter in a ref so the useEffect click handler can call it
+  const setSelectedItemDataRef = useRef(setSelectedItemData);
+  const setIsLoadingPropertiesRef = useRef(setIsLoadingProperties);
+  setSelectedItemDataRef.current = setSelectedItemData;
+  setIsLoadingPropertiesRef.current = setIsLoadingProperties;
+
+  // Touch detection state
+  const touchStartRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const tapCountRef = useRef(0);
+  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSelection = useCallback(async () => {
+    setSelectedItemData(null);
+    setIsLoadingProperties(false);
+    if (fragmentsRef.current) {
+      for (const [, model] of fragmentsRef.current.list) {
+        await model.resetHighlight();
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    let workerUrl: string | null = null;
+
+    const init = async () => {
+      try {
+        console.log('=== FragmentViewer init start ===');
+        const components = new OBC.Components();
+        componentsRef.current = components;
+
+        // Create world with TOE wrappers
+        const worlds = components.get(OBC.Worlds);
+        const world = worlds.create<
+          OBC.SimpleScene,
+          OBC.OrthoPerspectiveCamera,
+          OBC.SimpleRenderer
+        >();
+
+        // Setup scene
+        world.scene = new OBC.SimpleScene(components);
+        world.scene.setup();
+        world.scene.three.background = null;
+
+        // Setup renderer
+        const container = containerRef.current!;
+        world.renderer = new OBC.SimpleRenderer(components, container);
+
+        // Setup camera
+        world.camera = new OBC.OrthoPerspectiveCamera(components);
+
+        // Initialize components
+        components.init();
+
+        // Set camera position
+        await world.camera.controls.setLookAt(10, 10, 10, 0, 0, 0);
+
+        // Add grid
+        components.get(OBC.Grids).create(world);
+
+        // Setup FragmentsManager worker with cache busting
+        const workerScriptUrl = '/worker.mjs?v=' + Date.now();
+        console.log('Loading worker from:', workerScriptUrl);
+        workerUrl = await toClassicWorker(workerScriptUrl);
+        console.log('Worker blob URL created');
+        const fragments = components.get(OBC.FragmentsManager);
+        fragments.init(workerUrl);
+        fragmentsRef.current = fragments;
+
+        // Update fragments on camera movement
+        const onUpdate = () => fragments.core.update();
+        world.camera.controls.addEventListener('update', onUpdate);
+
+        // When a fragment model is loaded, add it to the scene
+        fragments.list.onItemSet.add(({ value: model }) => {
+          model.useCamera(world.camera.three);
+          world.scene.three.add(model.object);
+          fragments.core.update(true);
+          if (!disposed) setLoading(false);
+        });
+
+        // Fix z-fighting
+        fragments.core.models.materials.list.onItemSet.add(
+          ({ value: material }) => {
+            if (!('isLodMaterial' in material && material.isLodMaterial)) {
+              material.polygonOffset = true;
+              material.polygonOffsetUnits = 1;
+              material.polygonOffsetFactor = Math.random();
+            }
+          }
+        );
+
+        // Setup IFC loader with LOCAL WASM (same origin, no CORS)
+        const ifcLoader = components.get(OBC.IfcLoader);
+        console.log('Configuring IfcLoader with local WASM...');
+        await ifcLoader.setup({
+          autoSetWasm: false,
+          wasm: {
+            path: '/',
+            absolute: true,
+          },
+        });
+        console.log('IfcLoader setup complete');
+
+        // Load IFC model
+        console.log('Fetching IFC model from:', IFC_URL);
+        const file = await fetch(IFC_URL);
+        const data = await file.arrayBuffer();
+        const buffer = new Uint8Array(data);
+        console.log('IFC buffer size:', buffer.length);
+        await ifcLoader.load(buffer, false, 'sample-model', {
+          processData: {
+            progressCallback: (progress) => {
+              console.log(`IFC conversion progress: ${progress}%`);
+            },
+          },
+        });
+        console.log('IFC load complete');
+
+        // Dedicated helper to reset highlights across all loaded models
+        const resetAllHighlights = async () => {
+          for (const [, model] of fragments.list) {
+            await model.resetHighlight();
+          }
+        };
+
+        // Unified tap/click handler — used by both mouse and touch events
+        const handleTap = async (event: MouseEvent | TouchEvent, isDoubleTap: boolean) => {
+          const canvas = container.querySelector('canvas');
+          if (!canvas) return;
+
+          // Get client coordinates from either TouchEvent or MouseEvent
+          let clientX: number, clientY: number;
+          if ('touches' in event) {
+            const touch = event.touches[0] || event.changedTouches[0];
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+          } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+          }
+
+          const rect = canvas.getBoundingClientRect();
+          const mouse = new Vector2(
+            ((clientX - rect.left) / rect.width) * 2 - 1,
+            -((clientY - rect.top) / rect.height) * 2 + 1
+          );
+
+          console.log('[Tap] handleTap called', {
+            clientX,
+            clientY,
+            mouse: { x: mouse.x, y: mouse.y },
+            isDoubleTap,
+          });
+
+          // Debug: camera and fragment state
+          console.log('[Raycast] camera:', {
+            position: world.camera.three.position.toArray(),
+            projectionMatrix: world.camera.three.projectionMatrix.elements,
+            near: world.camera.three.near,
+            far: world.camera.three.far,
+          });
+          console.log('[Raycast] fragment models count:', fragments.list.size);
+          let idx = 0;
+          for (const [, model] of fragments.list) {
+            console.log(`[Raycast] model ${idx}:`, {
+              hasObject: !!model.object,
+              childrenCount: model.object?.children?.length,
+            });
+            idx++;
+          }
+
+          // Debug: compute ray direction with THREE.Raycaster
+          const raycaster = new Raycaster();
+          raycaster.setFromCamera(mouse, world.camera.three);
+          console.log('[Raycast] ray direction:', raycaster.ray.direction.toArray());
+          console.log('[Raycast] ray origin:', raycaster.ray.origin.toArray());
+
+          // Reset all highlights before raycast (ensures previous selection is cleared)
+          await resetAllHighlights();
+
+          // Raycast to find tapped/clicked element
+          console.log('[Raycast] calling fragments.raycast with:', {
+            camera: world.camera.three,
+            mouse: { x: mouse.x, y: mouse.y },
+            dom: canvas,
+          });
+          const result = await fragments.raycast({
+            camera: world.camera.three as PerspectiveCamera,
+            mouse,
+            dom: canvas,
+          });
+
+          console.log('[Tap] raycast result', result);
+
+          if (!result) {
+            console.log('[Tap] empty space — cleared selection');
+            setSelectedItemDataRef.current(null);
+            setIsLoadingPropertiesRef.current(false);
+            return;
+          }
+
+          // Highlight the tapped/clicked item
+          const { localId, fragments: hitModel } = result;
+          await hitModel.highlight([localId], {
+            color: new Color(0.2, 0.6, 1.0),
+            renderedFaces: RenderedFaces.TWO,
+            opacity: 1,
+            transparent: false,
+          });
+
+          // Fetch and display IFC properties
+          setIsLoadingPropertiesRef.current(true);
+          const itemData = await hitModel.getItemsData([localId]);
+          console.log(`${isDoubleTap ? 'Double-tap' : 'Tap/Click'} element:`, {
+            localId,
+            itemDataLength: itemData?.length,
+            sampleKeys: itemData?.[0] ? Object.keys(itemData[0]).slice(0, 10) : [],
+          });
+          setSelectedItemDataRef.current(itemData);
+          setIsLoadingPropertiesRef.current(false);
+        };
+
+        // Mouse click handler (desktop)
+        const handleMouseClick = async (event: MouseEvent) => {
+          await handleTap(event, false);
+        };
+
+        // Touch handlers (mobile)
+        const handleTouchStart = (event: TouchEvent) => {
+          const touch = event.touches[0];
+          const now = Date.now();
+
+          console.log('[Touch] touchstart', {
+            time: now,
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            tapCount: tapCountRef.current,
+            prevTime: touchStartRef.current?.time,
+          });
+
+          if (!touchStartRef.current || now - touchStartRef.current.time > 300) {
+            // First tap or tap after long delay
+            touchStartRef.current = { time: now, x: touch.clientX, y: touch.clientY };
+            tapCountRef.current = 1;
+            console.log('[Touch] → First tap recorded');
+          } else {
+            // Second tap within 300ms — treat as double-tap
+            tapCountRef.current = 2;
+            if (tapTimeoutRef.current) {
+              console.log('[Touch] → Clearing single-tap timeout for double-tap');
+              clearTimeout(tapTimeoutRef.current);
+              tapTimeoutRef.current = null;
+            }
+            event.preventDefault(); // prevent browser double-tap zoom
+            handleTap(event, true);
+            // Reset state immediately after handling double-tap
+            console.log('[Touch] → Resetting state after double-tap');
+            touchStartRef.current = null;
+            tapCountRef.current = 0;
+          }
+        };
+
+        const handleTouchEnd = (event: TouchEvent) => {
+          if (!touchStartRef.current) {
+            console.log('[Touch] touchend — no touchStartRef, ignoring');
+            return;
+          }
+          const touch = event.changedTouches[0];
+          const dx = touch.clientX - touchStartRef.current.x;
+          const dy = touch.clientY - touchStartRef.current.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          console.log('[Touch] touchend', {
+            distance,
+            tapCount: tapCountRef.current,
+            willWait: tapCountRef.current === 1,
+          });
+
+          // Cancel if finger moved too far (scroll/pan)
+          if (distance > 20) {
+            console.log('[Touch] → Movement too large, cancelling tap');
+            touchStartRef.current = null;
+            tapCountRef.current = 0;
+            if (tapTimeoutRef.current) {
+              clearTimeout(tapTimeoutRef.current);
+              tapTimeoutRef.current = null;
+            }
+            return;
+          }
+
+          // First tap — wait to see if a second tap follows
+          if (tapCountRef.current === 1) {
+            console.log('[Touch] → Starting 300ms double-tap wait');
+            tapTimeoutRef.current = setTimeout(() => {
+              if (tapCountRef.current === 1) {
+                console.log('[Touch] → Single tap confirmed after wait');
+                handleTap(event, false);
+              }
+              console.log('[Touch] → Resetting state after single-tap timeout');
+              touchStartRef.current = null;
+              tapCountRef.current = 0;
+              tapTimeoutRef.current = null;
+            }, 300);
+          }
+        };
+
+        const handleTouchMove = (event: TouchEvent) => {
+          if (!touchStartRef.current) return;
+          const touch = event.touches[0];
+          const dx = touch.clientX - touchStartRef.current.x;
+          const dy = touch.clientY - touchStartRef.current.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          console.log('[Touch] touchmove', { distance, cancelled: distance > 20 });
+
+          if (distance > 20) {
+            console.log('[Touch] → Cancelling tap due to movement');
+            touchStartRef.current = null;
+            tapCountRef.current = 0;
+            if (tapTimeoutRef.current) {
+              clearTimeout(tapTimeoutRef.current);
+              tapTimeoutRef.current = null;
+            }
+          }
+        };
+
+        // Wire up listeners
+        container.addEventListener('click', handleMouseClick);
+        container.addEventListener('touchstart', handleTouchStart, { passive: false });
+        container.addEventListener('touchend', handleTouchEnd);
+        container.addEventListener('touchmove', handleTouchMove);
+
+        cleanup = () => {
+          container.removeEventListener('click', handleMouseClick);
+          container.removeEventListener('touchstart', handleTouchStart);
+          container.removeEventListener('touchend', handleTouchEnd);
+          container.removeEventListener('touchmove', handleTouchMove);
+          world.camera.controls.removeEventListener('update', onUpdate);
+          if (workerUrl) URL.revokeObjectURL(workerUrl);
+          try {
+            components.dispose();
+          } catch {
+            // Ignore disposal errors
+          }
+        };
+        console.log('=== FragmentViewer init successful ===');
+      } catch (err) {
+        console.error('FragmentViewer init error:', err);
+        if (!disposed) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to load model'
+          );
+          setLoading(false);
+        }
+      }
+    };
+
+    init();
+
+    return () => {
+      disposed = true;
+      cleanup?.();
+    };
+  }, []);
+
+  return (
+    <div>
+      <div className="relative w-full h-[50vh] min-h-[300px] rounded-lg overflow-hidden border border-outline-variant">
+        <div ref={containerRef} className="w-full h-full" />
+
+        {loading && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-container-low/80">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-primary-container border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-sm text-on-surface-variant">Loading IFC model…</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-container-low/80">
+            <div className="text-center px-4">
+              <span className="material-symbols-outlined text-4xl text-error mb-2">
+                error
+              </span>
+              <p className="text-sm text-error">{error}</p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Check console for details
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <PropertiesPanel
+        data={selectedItemData}
+        loading={isLoadingProperties}
+        onClose={clearSelection}
+      />
+    </div>
+  );
+}
