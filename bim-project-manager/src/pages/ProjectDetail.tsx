@@ -372,11 +372,13 @@ export default function ProjectDetail() {
               )}
             </div>
             
-            {/* 3D Model Viewer */}
+            {/* 3D Model Viewer - stacks vertically on mobile */}
             <div className="card">
               <h2 className="font-headline text-lg text-on-surface mb-4">Project Visualization</h2>
-              <div className="h-[480px]">
-                <FragmentViewer />
+              <div className="h-[480px] flex flex-col lg:flex-row">
+                <div className="flex-1 min-h-[300px] lg:min-h-0">
+                  <FragmentViewer />
+                </div>
               </div>
             </div>
           </div>

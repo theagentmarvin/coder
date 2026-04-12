@@ -4,6 +4,7 @@ import * as OBF from '@thatopen/components-front';
 import { RenderedFaces, toClassicWorker } from '@thatopen/fragments';
 import * as THREE from 'three';
 import PropertiesPanel from './PropertiesPanel';
+import { addPropertyToElement, downloadExportedIfc, initWebIfc } from '../snippets/add-property';
 
 const IFC_URL = '/models/small.ifc';
 
@@ -17,6 +18,10 @@ export default function FragmentViewer() {
   const [selectedItemData, setSelectedItemData] = useState<any[] | null>(null);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
   const fragmentsRef = useRef<any>(null);
+  
+  // Store model ID for export and property addition (string from fragments)
+  const modelIdRef = useRef<string | null>(null);
+  const ifcLoaderRef = useRef<any>(null);
 
   // Keep the latest state-setter in a ref so the useEffect click handler can call it
   const setSelectedItemDataRef = useRef(setSelectedItemData);
@@ -37,6 +42,59 @@ export default function FragmentViewer() {
     if (highlighterRef.current) {
       await highlighterRef.current.clear('select');
     }
+  }, []);
+
+  // Callback to add a property to the selected element
+  const handleAddProperty = useCallback(async (
+    propName: string,
+    propValue: string | number | boolean,
+    propType: 'IfcLabel' | 'IfcReal' | 'IfcBoolean'
+  ) => {
+    const modelId = modelIdRef.current;
+    if (!modelId) {
+      console.error('No model loaded');
+      return false;
+    }
+    
+    // Get the selected element ID from the data
+    const selectedData = selectedItemData;
+    if (!selectedData || selectedData.length === 0) {
+      console.error('No element selected');
+      return false;
+    }
+    
+    // Get the expressID of the selected element
+    const elementId = selectedData[0].expressID;
+    if (!elementId) {
+      console.error('No element ID found');
+      return false;
+    }
+    
+    console.log(`Adding property "${propName}" to element ${elementId} in model ${modelId}`);
+    const success = await addPropertyToElement(modelId, elementId, propName, propValue, propType);
+    
+    if (success) {
+      // Refresh properties after adding
+      const model = fragmentsRef.current?.list?.get(modelId);
+      if (model) {
+        const itemData = await model.getItemsData([elementId]);
+        setSelectedItemData(itemData);
+      }
+    }
+    
+    return success;
+  }, [selectedItemData]);
+
+  // Callback to export the IFC file
+  const handleExportIfc = useCallback(async () => {
+    const modelId = modelIdRef.current;
+    if (!modelId) {
+      console.error('No model loaded');
+      return;
+    }
+    
+    console.log('Exporting IFC model:', modelId);
+    await downloadExportedIfc(modelId, `modified_ifc_${Date.now()}.ifc`);
   }, []);
 
   useEffect(() => {
@@ -141,6 +199,18 @@ export default function FragmentViewer() {
         console.log('IFC load complete');
         fragments.core.update(true);
         console.log('Fragments list size after load:', fragments.list.size);
+        
+        // Store model ID and initialize web-ifc for property editing
+        if (fragments.list.size > 0) {
+          const firstModelId = [...fragments.list.keys()][0];
+          modelIdRef.current = firstModelId;
+          ifcLoaderRef.current = ifcLoader;
+          
+          // Initialize web-ifc for property editing — pass the IFC buffer
+          console.log('Initializing web-ifc for property editing...');
+          await initWebIfc(buffer);
+          console.log('web-ifc initialized, modelId:', firstModelId);
+        }
 
         // Setup Raycasters (TOE)
         components.get(OBC.Raycasters).get(world);
@@ -165,6 +235,10 @@ export default function FragmentViewer() {
           for (const [modelId, localIds] of Object.entries(modelIdMap)) {
             const model = fragments.list.get(modelId);
             if (!model) continue;
+            
+            // Update the model ID ref for property addition
+            modelIdRef.current = modelId;
+            
             const itemData = await model.getItemsData([...localIds]);
             console.log('[Highlighter] fetched properties', {
               modelId,
@@ -348,6 +422,8 @@ export default function FragmentViewer() {
         data={selectedItemData}
         loading={isLoadingProperties}
         onClose={clearSelection}
+        onAddProperty={handleAddProperty}
+        onExportIfc={handleExportIfc}
       />
     </div>
   );
